@@ -1,0 +1,1 @@
+requires python 3.11 and bpy 4.3
