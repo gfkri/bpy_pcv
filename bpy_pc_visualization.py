@@ -13,13 +13,68 @@ import open3d as o3d
 import bpy
 from mathutils import Matrix, Vector
 
+
+# Function to link assets from the library
+def load_assets(library_path, assets, link=False):
+    # Open the library and import the specified assets
+    with bpy.data.libraries.load(library_path, link=link) as (data_from, data_to):
+        for category, asset_names in assets.items():
+            # Check if the category exists in the library
+            if hasattr(data_from, category):
+                available_assets = getattr(data_from, category)
+                print(f"Category: {category}")
+                print(f"  Available Assets: {available_assets}")
+                
+                # Find and load the specified assets
+                assets_to_load = [name for name in asset_names if name in available_assets]
+                if assets_to_load:
+                    setattr(data_to, category, assets_to_load)
+                    print(f"  Imported Assets: {assets_to_load}")
+                else:
+                    print(f"  No matching assets found for: {asset_names}")
+                    
+
+#######################################################################################################################
+def apply_geometry_node_group(object, geometry_node_name):
+    # Apply the default Geometry Nodes modifier
+    if geometry_node_name in bpy.data.node_groups:
+        geom_node_group = bpy.data.node_groups[geometry_node_name]
+        
+        # Add a Geometry Nodes modifier
+        geom_modifier = object.modifiers.new(name="GeometryNodes", type='NODES')
+        geom_modifier.node_group = geom_node_group
+        print(f"Applied Geometry Node group '{geometry_node_name}' to {object.name}")
+    else:
+        print(f"Geometry Node group '{geometry_node_name}' not found.")
+    
             
-                   
+
 def create_blender_scene():     
+    
+    library_path = "output/template.blend"
+    
+    
+    # Names of the assets in the library
+    default_geometry_node = "Output Geometry"  # Name of the Geometry Nodes group
+    default_material = "Output Material"       # Name of the Material    
+    # assets = {"materials": ['Output Material', 'Input Material'],
+    #           "node_groups": ['Output Geometry', 'Input Geometry'],
+    #           "worlds": ['World']}
+    
+    frame_collection_name = 'Collection'
+
+    
     cameras = ['FRONT', 'FRONT_LEFT', 'FRONT_RIGHT', 'SIDE_LEFT', 'SIDE_RIGHT']
     lasers = ['TOP', 'FRONT', 'SIDE_LEFT', 'SIDE_RIGHT', 'REAR']
+    # lasers = ['TOP']
     
-    input_dp = 'data/waymo/segment-10584247114982259878_490_000_510_000_with_camera_labels'
+    # debug
+    # cameras = []
+    # lasers = []
+
+    
+    # input_dp = 'data/waymo/segment-10584247114982259878_490_000_510_000_with_camera_labels'
+    input_dp = 'data/waymo/segment-10455472356147194054_1560_000_1580_000_with_camera_labels'
     output_dp = 'output'
 
     # in m
@@ -27,6 +82,7 @@ def create_blender_scene():
 
     # in m
     image_plane_distance = 100
+    combine_lasers = True
     
     workspace = Path.cwd()
     output_dp = Path(output_dp)
@@ -37,7 +93,7 @@ def create_blender_scene():
     point_cloud_dp = Path(input_dp) / 'pointcloud'
     calibration_dp = Path(input_dp) / 'calibration'
     
-    frame_id = 0
+    frame_id = 20
 
     image_dimensions = []
     max_image_width, max_image_height = 0, 0
@@ -52,22 +108,56 @@ def create_blender_scene():
     # Create a new Blender file
     bpy.ops.wm.read_factory_settings()       
     
-    # Delete the default cube
-    if "Cube" in bpy.data.objects:
-        bpy.data.objects['Cube'].select_set(True)
-        bpy.ops.object.delete()
+    # Open the template blend file
+    bpy.ops.wm.open_mainfile(filepath=library_path)
     
-    for laser_name in lasers:
-        pcd_fp = point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply"
-        bpy.ops.wm.ply_import(filepath=str(pcd_fp))
+    # load_assets(library_path, {'scenes': ['Scene']})
+    
+    # scene_name = bpy.data.scenes[0].name
+    # bpy.data.scenes.remove(bpy.data.scenes[scene_name])
+    # bpy.data.scenes[-1].name = scene_name   
+    
+    collection = bpy.data.collections.get(frame_collection_name)
+    if collection:
+        # Remove all objects in the collection
+        for obj in list(collection.objects):  # Use list() to avoid modification during iteration
+            bpy.data.objects.remove(obj, do_unlink=True)
+        print(f"Cleared all objects in the collection: {frame_collection_name}")
+    else:
+        print(f"Collection '{collection_name}' not found.")
+        
+    
+    pcd_fps = [point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply" 
+               for laser_name in lasers]
+        
+    if combine_lasers and len(pcd_fps) > 1:
+        pcs = [o3d.io.read_point_cloud(str(pcd_fp)) for pcd_fp in pcd_fps]
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(np.vstack([np.asarray(pc.points) for pc in pcs]))
+        pcd.colors = o3d.utility.Vector3dVector(np.vstack([np.asarray(pc.colors) for pc in pcs]))
+        comnbined_pcd_fp = output_dp / f"{frame_id:05d}_COMBINED.ply"
+        o3d.io.write_point_cloud(str(comnbined_pcd_fp), pcd)
+        bpy.ops.wm.ply_import(filepath=str(comnbined_pcd_fp))
+        imported_object = bpy.context.view_layer.objects.active
+        apply_geometry_node_group(imported_object, default_geometry_node)
+    else:
+        for pcd_fp in pcd_fps:
+            bpy.ops.wm.ply_import(filepath=str(pcd_fp))
+            imported_object = bpy.context.view_layer.objects.active
+            apply_geometry_node_group(imported_object, default_geometry_node)
         
     for img_dim, camera_name in zip(image_dimensions, cameras):
+        
         # load camera calibration
-
         intrinsics_fp = calibration_dp / f"intrinsics_{camera_name}.npz"
         intrinsics = np.load(intrinsics_fp, allow_pickle=True)        
         f_u, f_v, c_u, c_v = intrinsics['f_u'], intrinsics['f_v'], intrinsics['c_u'], intrinsics['c_v']
+        
+        # Intrinsic matrix (3x3)
         K = np.array([[f_u, 0, c_u], [0, f_v, c_v], [0, 0, 1]])
+        
+        # Distortion coefficients
+        dist_coeffs = np.array(intrinsics)
 
         fov_u = 2 * np.arctan(max_image_width / (2 * f_u))
         fov_v = 2 * np.arctan(max_image_height / (2 * f_v))
@@ -131,7 +221,12 @@ def create_blender_scene():
         # Set the camera as the active camera
         if camera_name == 'FRONT':
             bpy.context.scene.camera = camera_object
-    
+        else:
+            # set inactive for rendering and visibility to false
+            image_mesh.hide_render = True
+            image_mesh.hide_viewport = True  
+            
+            
     # Set the resolution
     bpy.context.scene.render.resolution_x = max_image_width
     bpy.context.scene.render.resolution_y = max_image_height
