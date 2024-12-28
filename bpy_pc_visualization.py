@@ -73,8 +73,9 @@ def create_blender_scene():
     # lasers = []
 
     
-    # input_dp = 'data/waymo/segment-10584247114982259878_490_000_510_000_with_camera_labels'
-    input_dp = 'data/waymo/segment-10455472356147194054_1560_000_1580_000_with_camera_labels'
+    input_dp = 'data/waymo/segment-10584247114982259878_490_000_510_000_with_camera_labels'
+    # input_dp = 'data/waymo/segment-10455472356147194054_1560_000_1580_000_with_camera_labels'
+    input_dp = 'data/waymo/segment-10837554759555844344_6525_000_6545_000_with_camera_labels'
     output_dp = 'output'
 
     # in m
@@ -93,7 +94,7 @@ def create_blender_scene():
     point_cloud_dp = Path(input_dp) / 'pointcloud'
     calibration_dp = Path(input_dp) / 'calibration'
     
-    frame_id = 20
+    frame_id = 55
 
     image_dimensions = []
     max_image_width, max_image_height = 0, 0
@@ -190,6 +191,7 @@ def create_blender_scene():
         plane_scale = sensor_width / focal_length * image_plane_distance / plane_width
 
         # Calculate offsets based on principal point
+        # TODO check if this is correct
         offset_x = -(c_u - (img_dim[1] / 2)) * plane_width / img_dim[1]
         offset_y = (c_v - (img_dim[0] / 2)) * plane_height / img_dim[0]
 
@@ -231,7 +233,7 @@ def create_blender_scene():
     bpy.context.scene.render.resolution_x = max_image_width
     bpy.context.scene.render.resolution_y = max_image_height
         
-    output_path = output_dp / "output_file.blend"  # Update with your desired output path
+    output_path = output_dp / "highway_output_file.blend"  # Update with your desired output path
     bpy.ops.wm.save_as_mainfile(filepath=str(output_path))
         
     print('Done')
