@@ -49,14 +49,27 @@ def apply_geometry_node_group(object, geometry_node_name):
         print(f"Applied Geometry Node group '{geometry_node_name}' to {object.name}")
     else:
         print(f"Geometry Node group '{geometry_node_name}' not found.")
+        
+        
+#######################################################################################################################        
+def get_image_mesh_plane_resolution(image_mesh):
+    material = image_mesh.active_material
+    if material and material.node_tree:
+        # Find the image texture node
+        for node in material.node_tree.nodes:
+            if node.type == 'TEX_IMAGE':
+                image = node.image
+                if image:
+                    width, height = image.size
+                    return width, height
+    return 0, 0
     
     
-
 #######################################################################################################################
 def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, image_fp, img_dim, render_dim, 
-                          sensor_width, image_plane_scale, axis_scaling, frustum_material='Input Material'):
-    
-    
+                          sensor_width, far_plane_scale, near_plane_scale, axis_scaling, frustum_material='Input Material', 
+                          adjust_frustum_fov=True):
+
     f_u, f_v, c_u, c_v = intrinsics['f_u'], intrinsics['f_v'], intrinsics['c_u'], intrinsics['c_v']
         
     # Camera matrix
@@ -73,7 +86,7 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     
     # Focal length in m
     focal_length = f_u / max_image_width * sensor_width
-    image_plane_distance = f_u / max_image_width * image_plane_scale
+    image_plane_distance = f_u / max_image_width * far_plane_scale
     
     R = extrinsics[:3, :3]
     t = extrinsics[:3, 3:4]
@@ -111,54 +124,83 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     # Combine the offset with the original camera-to-vehicle transformation
     T_cam2vehicle_with_offset = T_cam2vehicle @ plane_distance_matrix @ scale_matrix @ principle_offset_matrix
     
+    # Add image mesh
     bpy.ops.image.import_as_mesh_planes(shader='SHADELESS', files=[{'name':image_fp}])
     image_mesh = bpy.context.object
     bpy.context.collection.objects.unlink(image_mesh)
     main_collection.objects.link(image_mesh)
     image_mesh.name = f'{camera_name}_IMAGE'
-    image_mesh.matrix_world = T_cam2vehicle_with_offset
-            
+    image_mesh.matrix_world = T_cam2vehicle_with_offset    
+
+    # Set the image mesh material
     camera = bpy.data.cameras.new(name=camera_name)        
-    camera_object = bpy.data.objects.new(camera_name, camera)
-    main_collection.objects.link(camera_object)
-    # bpy.context.scene.collection.objects.unlink(camera_object)  
+    camera_obj = bpy.data.objects.new(camera_name, camera)
+    main_collection.objects.link(camera_obj)
+    # bpy.context.scene.collection.objects.unlink(camera_obj)  
 
     # Position the camera
-    # camera_object.location = tuple(t)  # Adjust as needed
+    # camera_obj.location = tuple(t)  # Adjust as needed
     camera.lens = focal_length * 1000  # Convert to mm as required by Blender
-    camera_object.matrix_world = T_cam2vehicle  # Adjust as needed
+    camera_obj.matrix_world = T_cam2vehicle  # Adjust as needed
     
-    # Create a new collection for the camera
-    frame_name = f'FRAME {camera_name}'
-    frame_collection = bpy.data.collections.new(frame_name)
-    # bpy.context.scene.collection.children.link(frame_collection)
-    main_collection.children.link(frame_collection)
 
 
     if axis_scaling > 0:
+        # Create a new collection for the camera
+        frame_name = f'Frame Camera {camera_name}'
+        frame_collection = bpy.data.collections.new(frame_name)
+        main_collection.children.link(frame_collection)
+        
         vehicle_frame = bpy.data.objects.get("Vehicle Frame")
         camera_frame = utils.duplicate_object(vehicle_frame, collection=frame_collection)
-        camera_frame.name = f'Frame'
+        camera_frame.name = frame_name
         camera_frame.matrix_world = extrinsics @ Matrix.Scale(axis_scaling, 4)
+        
+        frame_collection.hide_viewport = True
+        frame_collection.hide_render = True      
 
     # Set the camera as the active camera
     if camera_name == 'FRONT':
-        bpy.context.scene.camera = camera_object
+        bpy.context.scene.camera = camera_obj
     else:
         pass
         # set inactive for rendering and visibility to false
         # image_mesh.hide_render = True
         # image_mesh.hide_viewport = True  
         
-    frustum_obj = frustum.create_camera_frustum(camera_object, farplane_ratio=image_plane_scale, 
-                                                nearplane_ratio=0.1, thickness=0.01)
+      
+    
+    if adjust_frustum_fov:
+        vertices = [np.array(image_mesh.matrix_world @ vertex.co) for vertex in image_mesh.data.vertices]       
+        vertices = [vertices[idx] for idx in [0, 2, 1, 3]]     # Rearrange the vertices to match the Blender cube vertices
+        camera_origin = np.array(camera_obj.matrix_world.translation)
+        
+        frustum_corners = []
+        for i in range(4):
+            ray = vertices[i] - camera_origin
+            frustum_corners.append(vertices[i])
+            frustum_corners.append(camera_origin + ray * near_plane_scale)
+
+        
+        # frustum_corners[0] = vertices[0]
+        # frustum_corners[2] = vertices[2]
+        # frustum_corners[4] = vertices[1]
+        # frustum_corners[6] = vertices[3]
+        
+    else:
+        frustum_corners = frustum.get_camera_frustum_corners(camera_obj, far_plane_scale, near_plane_scale)      
+        
+        
+        
+            
+    
+    frustum_obj = frustum.create_frustum(f"Frustum {camera_name}", frustum_corners, thickness=0.01)
     
     # Apply the frustum material
     frustum_obj.data.materials.append(bpy.data.materials[frustum_material])    
     main_collection.objects.link(frustum_obj)
     
-    
-            
+       
 #######################################################################################################################
 def create_blender_scene():     
     
@@ -194,11 +236,13 @@ def create_blender_scene():
     sensor_width = 0.036
 
     # in m
-    image_plane_scale = 0.4
+    far_plane_scale = 0.4
+    near_plane_scale = 0.25
+    
     combine_lasers = False
     
     # scaling <0 means no axis
-    axis_scaling = 0.4
+    axis_scaling = 0.2
     
     workspace = Path.cwd()
     output_dp = Path(output_dp)
@@ -247,26 +291,65 @@ def create_blender_scene():
     pcd_fps = [point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply" 
                for laser_name in lasers]
         
-    if combine_lasers and len(pcd_fps) > 1:
-        pcs = [o3d.io.read_point_cloud(str(pcd_fp)) for pcd_fp in pcd_fps]
+    if combine_lasers and len(lasers) > 1:
+        pcs = [o3d.io.read_point_cloud(str(point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply" )) 
+               for pcd_fp in pcd_fps]
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(np.vstack([np.asarray(pc.points) for pc in pcs]))
         pcd.colors = o3d.utility.Vector3dVector(np.vstack([np.asarray(pc.colors) for pc in pcs]))
         comnbined_pcd_fp = output_dp / f"{frame_id:05d}_COMBINED.ply"
         o3d.io.write_point_cloud(str(comnbined_pcd_fp), pcd)
         bpy.ops.wm.ply_import(filepath=str(comnbined_pcd_fp))
-        imported_object = bpy.context.view_layer.objects.active
-        apply_geometry_node_group(imported_object, pc_geometry_node)
-    else:
-        for pcd_fp in pcd_fps:
+        imported_obj = bpy.context.view_layer.objects.active
+        apply_geometry_node_group(imported_obj, pc_geometry_node)
+    else:        
+        vehicle_frame = bpy.data.objects.get("Vehicle Frame")
+        for laser_name in lasers:
+            laser_collection = bpy.data.collections.new(f'Laser {laser_name}')
+            main_collection.children.link(laser_collection)
+            
+            # set lidar visualization
+            extrinsics_fp = calibration_dp / f"extrinsics_laser_{laser_name}.npy"
+            extrinsics = np.load(extrinsics_fp)
+            extrinsics = Matrix(extrinsics).to_4x4()
+            
+            lidar_obj = bpy.data.objects.get("LiDAR")
+            lidar_obj = utils.duplicate_object(lidar_obj, collection=laser_collection)
+            lidar_obj.name = f'LiDAR {laser_name}'
+            lidar_obj.matrix_world = extrinsics @ Matrix.Scale(0.5, 4)
+            lidar_obj.hide_viewport = True
+            lidar_obj.hide_render = True
+            
+            
+
+            
+            if axis_scaling > 0:
+                 # Create a new collection for the camera
+                frame_name = f'Frame Laser {laser_name}'
+                frame_collection = bpy.data.collections.new(frame_name)
+                laser_collection.children.link(frame_collection)
+                
+                # the top lidar is not aligned with the vehicle frame as depicted in the paper
+                # https://github.com/waymo-research/waymo-open-dataset/issues/726
+                laser_frame = utils.duplicate_object(vehicle_frame, collection=frame_collection)
+                laser_frame.name = frame_name
+                laser_frame.matrix_world = extrinsics @ Matrix.Scale(axis_scaling, 4)     
+                
+                frame_collection.hide_viewport = True
+                frame_collection.hide_render = True           
+            
+            pcd_fp = point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply" 
             bpy.ops.wm.ply_import(filepath=str(pcd_fp))
-            imported_object = bpy.context.view_layer.objects.active
-            apply_geometry_node_group(imported_object, pc_geometry_node)
-        
+            imported_obj = bpy.context.view_layer.objects.active
+            bpy.context.collection.objects.unlink(imported_obj)
+            laser_collection.objects.link(imported_obj)
+            apply_geometry_node_group(imported_obj, pc_geometry_node)
+
+    # Create cameras    
     for img_dim, camera_name in zip(image_dimensions, cameras):
         # load camera calibration
-        intrinsics_fp = calibration_dp / f"intrinsics_{camera_name}.npz"
-        extrinsics_fp = calibration_dp / f"extrinsics_{camera_name}.npy"
+        intrinsics_fp = calibration_dp / f"intrinsics_cam_{camera_name}.npz"
+        extrinsics_fp = calibration_dp / f"extrinsics_cam_{camera_name}.npy"
         intrinsics = np.load(intrinsics_fp, allow_pickle=True)        
         extrinsics = np.load(extrinsics_fp)
         
@@ -274,12 +357,12 @@ def create_blender_scene():
         shutil.copy(image_fp, output_image_dp / image_fp.name)
         
         camera_collection = bpy.data.collections.new(f'Camera {camera_name}')
-        # bpy.context.scene.collection.children.link(camera_collection)
         main_collection.children.link(camera_collection)
         
         create_blender_camera(camera_collection, camera_name, intrinsics, extrinsics, 
                               str(output_image_dp / image_fp.name), img_dim, render_dim, 
-                              sensor_width, image_plane_scale, axis_scaling, frustum_material)
+                              sensor_width, far_plane_scale, near_plane_scale, 
+                              axis_scaling, frustum_material)
 
     # Set the resolution
     bpy.context.scene.render.resolution_x = max_image_width
@@ -293,8 +376,6 @@ def create_blender_scene():
     print('Done')
            
                 
-
-
 #######################################################################################################################   
 def main():
     create_blender_scene()

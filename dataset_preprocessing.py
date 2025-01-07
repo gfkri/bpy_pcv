@@ -20,14 +20,12 @@ def write_sequence_information(frame, image_dp, calibration_dp, point_cloud_dp, 
     """ Initialize folder structure and write information, which is common for all frames in a sequence 
     (camera calibration), to the output folder. """
     
-    if write_images:
-        for index, camera_image in enumerate(frame.images):                    
-            camera_name = open_dataset.CameraName.Name.Name(camera_image.name)
+    if write_images:            
+        for calibration in frame.context.camera_calibrations:
+            camera_name = open_dataset.CameraName.Name.Name(calibration.name)
             (image_dp / camera_name).mkdir(parents=True, exist_ok=True)
             
-            calib = next(cc for cc in frame.context.camera_calibrations
-                                if cc.name == camera_image.name)
-            f_u, f_v, c_u, c_v, k1, k2, p1, p2, k3 = calib.intrinsic
+            f_u, f_v, c_u, c_v, k1, k2, p1, p2, k3 = calibration.intrinsic
             camera_intrinsics = {
                 'f_u': f_u,
                 'f_v': f_v,
@@ -40,14 +38,16 @@ def write_sequence_information(frame, image_dp, calibration_dp, point_cloud_dp, 
                 'k3': k3
             }                        
 
-            extrinsics = np.array(calib.extrinsic.transform, dtype=np.float64).reshape(4, 4)
-            np.savez(calibration_dp / f'intrinsics_{camera_name}.npz', **camera_intrinsics)
-            np.save(calibration_dp / f'extrinsics_{camera_name}.npy', extrinsics)
+            extrinsics = np.array(calibration.extrinsic.transform, dtype=np.float64).reshape(4, 4)
+            np.savez(calibration_dp / f'intrinsics_cam_{camera_name}.npz', **camera_intrinsics)
+            np.save(calibration_dp / f'extrinsics_cam_{camera_name}.npy', extrinsics)
             
     if write_point_cloud:
-        for laser in frame.lasers:
-            laser_name = open_dataset.LaserName.Name.Name(laser.name)
+        for calibration in frame.context.laser_calibrations:
+            laser_name = open_dataset.LaserName.Name.Name(calibration.name)
             (point_cloud_dp / laser_name).mkdir(parents=True, exist_ok=True)
+            extrinsics = np.reshape(np.array(calibration.extrinsic.transform), [4, 4])
+            np.save(calibration_dp / f'extrinsics_laser_{laser_name}.npy', extrinsics)
 
 
 #######################################################################################################################
@@ -70,7 +70,8 @@ def decode_waymo_data(write_images=True, write_point_cloud=True):
     output_dp = Path(output_dp)
     
     files = list(input_dp.glob('*.tfrecord'))
-    files = [f for f in files if f.stem in sequences]
+    # files = [f for f in files if f.stem in sequences]
+    files = files[800:803]
     
     init = False
     for fp in tqdm(files):
@@ -127,8 +128,9 @@ def decode_waymo_data(write_images=True, write_point_cloud=True):
                     pcd = o3d.geometry.PointCloud()
                     pcd.points = o3d.utility.Vector3dVector(point[:, 3:])                   
                     pcd.colors = o3d.utility.Vector3dVector(colors)
-
-                    laser_name = open_dataset.LaserName.Name.Name(laser.name)
+                                        
+                    laser_name = open_dataset.LaserName.Name.Name(laser.name)                  
+                    
                     fp = point_cloud_dp / laser_name / f"{frame_idx:05d}_{laser_name}.ply"
                     o3d.io.write_point_cloud(str(fp), pcd)
 
