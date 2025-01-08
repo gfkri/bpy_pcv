@@ -236,8 +236,8 @@ def create_blender_scene():
     sensor_width = 0.036
 
     # in m
-    far_plane_scale = 0.4
-    near_plane_scale = 0.25
+    far_plane_scale = 0.55
+    near_plane_scale = 0.4
     
     combine_lasers = False
     
