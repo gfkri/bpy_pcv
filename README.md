@@ -1,4 +1,4 @@
-# Renderable Pointcloud Generator for 3D Perception and Blender
+# Blender Point Cloud Generator for 3D Perception
 
 ## Overview
 
