@@ -3,8 +3,9 @@
 ## Overview
 
 <div style="display: flex; justify-content: space-between;">
-   <img src="./doc/screenshot_sm.png" alt="Screenshot" style="width: 48%;">
-   <img src="./doc/egrendering_sm.png" alt="Example Rendering" style="width: 48%;">
+   <img src="./doc/screenshot_sm.png" alt="Screenshot" style="width: 32.8%;">
+   <img src="./doc/egrendering_sm.png" alt="Example Rendering" style="width: 32.8%;">
+   <img src="./doc/frustum_sm.png" alt="Example Rendering" style="width: 32.8%;">
 </div>
 
 This repository provides scripting tools to generate blender files in order to render point clouds from the Waymo 3D object detection benchmark. The tool utilizes a Blender file as a template to create an adjustable Blender project setup.
