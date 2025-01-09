@@ -320,9 +320,6 @@ def create_blender_scene():
             lidar_obj.hide_viewport = True
             lidar_obj.hide_render = True
             
-            
-
-            
             if axis_scaling > 0:
                  # Create a new collection for the camera
                 frame_name = f'Frame Laser {laser_name}'
