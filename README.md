@@ -1,7 +1,5 @@
 # Renderable Pointcloud Generator for 3D Perception and Blender
 
----
-
 ## Overview
 
 <div style="display: flex; justify-content: space-between;">
@@ -16,8 +14,6 @@ It utilizes the LiDAR camera calibration to place the LiDAR point clouds as well
 
 This project is a work in progress. Contributions and suggestions are welcome. Please refer to the following section for current tasks and improvements.
 
----
-
 ## Features/TODOs
 
 - [x] Generate Blender including renderable point cloud and image planes 
@@ -29,14 +25,11 @@ This project is a work in progress. Contributions and suggestions are welcome. P
 - [ ] Modelling Camera Motion
 - [ ] Embed object class labels, bounding boxes, and confidence scores into the visualization
 - [ ] Better configurable setup, e.g. using hydra 
----
 
 ## Requirements
 
 - Python 3.11
 - Blender (`bpy 4.3`)
-
----
 
 ## Getting Started
 
@@ -59,5 +52,4 @@ This project is a work in progress. Contributions and suggestions are welcome. P
 
 5. Customize the rendering setup as needed and enjoy the result
 
----
 
