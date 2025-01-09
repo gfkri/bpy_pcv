@@ -203,8 +203,7 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
        
 #######################################################################################################################
 def create_blender_scene():     
-    
-    library_path = "output/template.blend"
+    library_path = "data/template.blend"
     
     
     # Names of the assets in the library
