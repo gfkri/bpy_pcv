@@ -1,0 +1,13 @@
+cache_dirs:
+  root: "data/default"
+  point_clouds: "${.root}/${sequence}/pointclouds"
+  calibration: "${.root}/${sequence}/calibration"
+  images: "${.root}/${sequence}/images"
+
+file_name_templates:
+  extrinsics: "extrinsics_{sensor_type}_{sensor_name}.npy"
+  intrinsics: "intrinsics_{sensor_type}_{sensor_name}.npz"
+  image: "{sensor_name}/{frame_idx:05d}_{sensor_name}.jpg"     
+  point_cloud: "{sensor_name}/{frame_idx:05d}_{sensor_name}.ply"
+  combined_point_cloud: "{frame_idx:05d}_combined.ply"
+

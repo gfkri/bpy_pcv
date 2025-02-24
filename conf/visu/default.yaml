@@ -1,0 +1,9 @@
+axes_size: 0.2 # in meters, smaller than 0 will disable axes
+combine_point_clouds: false
+
+
+sensor_width: 0.036 # in m
+
+# set if you want to visualize the frustum of the camera
+far_plane_ratio: 1.0 # relative to the actual frustum visualized in blender
+near_plane_ratio: 0.1 # relative to the actual frustum visualized in blender

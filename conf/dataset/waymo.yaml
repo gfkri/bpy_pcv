@@ -1,0 +1,19 @@
+defaults:
+  - default
+
+cache_dirs:
+  root: "data/waymo"
+
+cameras:
+  - "FRONT"
+  - "FRONT_LEFT"
+  - "FRONT_RIGHT"
+  - "SIDE_LEFT"
+  - "SIDE_RIGHT"
+
+lasers:
+  - "TOP"
+  - "FRONT"
+  - "SIDE_LEFT"
+  - "SIDE_RIGHT"
+  - "REAR"

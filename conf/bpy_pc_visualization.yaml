@@ -1,0 +1,10 @@
+defaults:
+  - dataset: waymo
+  - blender: default
+  - hydra: default
+  - visu: default
+
+
+sequence: "segment-10584247114982259878_490_000_510_000_with_camera_labels"
+frame_idx: 55
+output_file_name: output.blend

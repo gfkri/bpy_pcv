@@ -10,8 +10,10 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
             "justMyCode": false,
             "env": {
+                "HYDRA_FULL_ERROR":"1",
                 "PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT": "10"
             }
         },
@@ -24,6 +26,7 @@
             "cwd": "${workspaceFolder}",
             "justMyCode": true,
             "env": {
+                "HYDRA_FULL_ERROR":"1"
                 // "PYTHONPATH": "${workspaceFolder}/thesis/scripts"
             }
         },

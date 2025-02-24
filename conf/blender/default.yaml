@@ -1,0 +1,8 @@
+library_path: "data/template.blend"
+
+# Names of the assets in the library
+pc_geometry_node: "Output Geometry"  # Name of the Geometry Nodes group for the point clouds
+pc_material: "Output Material"       # Name of the Material for the point clouds
+frustum_material: "Input Material"   # Name of the Material for the frustums
+
+frame_collection_name: "Collection"

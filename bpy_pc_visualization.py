@@ -6,12 +6,15 @@ import os
 import math
 import numpy as np
 import itertools
-from pathlib import Path
+import pathlib
 import cv2
 from tqdm import tqdm
 import open3d as o3d
 import bpy
 from mathutils import Matrix, Vector
+
+import hydra
+from omegaconf import DictConfig, OmegaConf
 
 from tools import frustum, utils
 
@@ -67,7 +70,7 @@ def get_image_mesh_plane_resolution(image_mesh):
     
 #######################################################################################################################
 def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, image_fp, img_dim, render_dim, 
-                          sensor_width, far_plane_scale, near_plane_scale, axis_scaling, frustum_material='Input Material', 
+                          cfg_visu, frustum_material='Input Material', 
                           adjust_frustum_fov=True):
 
     f_u, f_v, c_u, c_v = intrinsics['f_u'], intrinsics['f_v'], intrinsics['c_u'], intrinsics['c_v']
@@ -85,8 +88,8 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     max_image_width, max_image_height = render_dim
     
     # Focal length in m
-    focal_length = f_u / max_image_width * sensor_width
-    image_plane_distance = f_u / max_image_width * far_plane_scale
+    focal_length = f_u / max_image_width * cfg_visu.sensor_width
+    image_plane_distance = f_u / max_image_width * cfg_visu.far_plane_ratio
     
     R = extrinsics[:3, :3]
     t = extrinsics[:3, 3:4]
@@ -108,7 +111,7 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     # image plane dimensions per default are: aspect ratio x 1.0
     plane_height = 1.0
     plane_width = img_aspect_ratio * plane_height
-    plane_scale = sensor_width / focal_length * image_plane_distance / plane_width
+    plane_scale = cfg_visu.sensor_width / focal_length * image_plane_distance / plane_width
 
     # Calculate offsets based on principal point
     # TODO check if this is correct
@@ -144,8 +147,7 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     camera_obj.matrix_world = T_cam2vehicle  # Adjust as needed
     
 
-
-    if axis_scaling > 0:
+    if cfg_visu.axes_size > 0:
         # Create a new collection for the camera
         frame_name = f'Frame Camera {camera_name}'
         frame_collection = bpy.data.collections.new(frame_name)
@@ -154,7 +156,7 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
         vehicle_frame = bpy.data.objects.get("Vehicle Frame")
         camera_frame = utils.duplicate_object(vehicle_frame, collection=frame_collection)
         camera_frame.name = frame_name
-        camera_frame.matrix_world = extrinsics @ Matrix.Scale(axis_scaling, 4)
+        camera_frame.matrix_world = extrinsics @ Matrix.Scale(cfg_visu.axes_size, 4)
         
         frame_collection.hide_viewport = True
         frame_collection.hide_render = True      
@@ -179,7 +181,7 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
         for i in range(4):
             ray = vertices[i] - camera_origin
             frustum_corners.append(vertices[i])
-            frustum_corners.append(camera_origin + ray * near_plane_scale)
+            frustum_corners.append(camera_origin + ray * cfg_visu.near_plane_ratio)
 
         
         # frustum_corners[0] = vertices[0]
@@ -188,12 +190,10 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
         # frustum_corners[6] = vertices[3]
         
     else:
-        frustum_corners = frustum.get_camera_frustum_corners(camera_obj, far_plane_scale, near_plane_scale)      
+        frustum_corners = frustum.get_camera_frustum_corners(camera_obj, cfg_visu.far_plane_ratio, 
+                                                             cfg_visu.near_plane_ratio)      
         
         
-        
-            
-    
     frustum_obj = frustum.create_frustum(f"Frustum {camera_name}", frustum_corners, thickness=0.01)
     
     # Apply the frustum material
@@ -202,62 +202,26 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     
        
 #######################################################################################################################
-def create_blender_scene():     
-    library_path = "data/template.blend"
-    
-    
-    # Names of the assets in the library
-    pc_geometry_node = "Output Geometry"  # Name of the Geometry Nodes group for the point clouds
-    pc_material = "Output Material"       # Name of the Material for the point clouds
-    frustum_material = "Input Material"   # Name of the Material for the frustums
-    
-    # assets = {"materials": ['Output Material', 'Input Material'],
-    #           "node_groups": ['Output Geometry', 'Input Geometry'],
-    #           "worlds": ['World']}
-    
-    frame_collection_name = 'Collection'
+@hydra.main(version_base=None, config_path="conf", config_name="bpy_pc_visualization")
+def create_blender_scene(cfg : DictConfig) -> None:
+    print(OmegaConf.to_yaml(cfg)) 
 
+    output_dp = pathlib.Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
+    image_dp = pathlib.Path(cfg.dataset.cache_dirs.images)
+    point_cloud_dp = pathlib.Path(cfg.dataset.cache_dirs.point_clouds)
+    calibration_dp = pathlib.Path(cfg.dataset.cache_dirs.calibration)
     
-    cameras = ['FRONT', 'FRONT_LEFT', 'FRONT_RIGHT', 'SIDE_LEFT', 'SIDE_RIGHT']
-    lasers = ['TOP', 'FRONT', 'SIDE_LEFT', 'SIDE_RIGHT', 'REAR']
-    # lasers = ['TOP']
-    
-    # debug
-    # cameras = []
-    # lasers = []
-
-    input_dp = 'data/waymo/segment-10584247114982259878_490_000_510_000_with_camera_labels'
-    # input_dp = 'data/waymo/segment-10455472356147194054_1560_000_1580_000_with_camera_labels'
-    input_dp = 'data/waymo/segment-10837554759555844344_6525_000_6545_000_with_camera_labels'
-    output_dp = 'output'
-
-    # in m
-    sensor_width = 0.036
-
-    # in m
-    far_plane_scale = 0.55
-    near_plane_scale = 0.4
-    
-    combine_lasers = False
-    
-    # scaling <0 means no axis
-    axis_scaling = 0.2
-    
-    workspace = Path.cwd()
-    output_dp = Path(output_dp)
-    output_image_dp = output_dp / 'images'
+    # output image directory for relative reference within blender
+    output_image_dp = output_dp / image_dp.stem
     output_image_dp.mkdir(parents=True, exist_ok=True)
-
-    image_dp = Path(input_dp) / 'images'
-    point_cloud_dp = Path(input_dp) / 'pointcloud'
-    calibration_dp = Path(input_dp) / 'calibration'
     
-    frame_id = 55
-
+    # file name templates
+    fnt = cfg.dataset.file_name_templates
+    
     image_dimensions = []
     max_image_width, max_image_height = 0, 0
-    for camera_name in cameras:
-        image_fp = image_dp / camera_name / f"{frame_id:05d}_{camera_name}.jpg"
+    for camera_name in cfg.dataset.cameras:
+        image_fp = image_dp / fnt.image.format(frame_idx=cfg.frame_idx, sensor_name=camera_name)
         image = cv2.imread(str(image_fp))
         image_dimensions.append(image.shape)
         max_image_width = max(max_image_width, image.shape[1])
@@ -270,7 +234,7 @@ def create_blender_scene():
     bpy.ops.wm.read_factory_settings()       
     
     # Open the template blend file
-    bpy.ops.wm.open_mainfile(filepath=library_path)
+    bpy.ops.wm.open_mainfile(filepath=cfg.blender.library_path)
     
     # load_assets(library_path, {'scenes': ['Scene']})
     
@@ -278,37 +242,38 @@ def create_blender_scene():
     # bpy.data.scenes.remove(bpy.data.scenes[scene_name])
     # bpy.data.scenes[-1].name = scene_name   
     
-    main_collection = bpy.data.collections.get(frame_collection_name)
+    main_collection = bpy.data.collections.get(cfg.blender.frame_collection_name)
     if main_collection:
         # Remove all objects in the collection
         for obj in list(main_collection.objects):  # Use list() to avoid modification during iteration
             bpy.data.objects.remove(obj, do_unlink=True)
-        print(f"Cleared all objects in the collection: {frame_collection_name}")
+        print(f"Cleared all objects in the collection: {cfg.blender.frame_collection_name}")
     else:
-        print(f"Collection '{collection_name}' not found.")
+        print(f"Collection '{cfg.blender.frame_collection_name}' not found.")
         
-    pcd_fps = [point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply" 
-               for laser_name in lasers]
-        
-    if combine_lasers and len(lasers) > 1:
-        pcs = [o3d.io.read_point_cloud(str(point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply" )) 
-               for pcd_fp in pcd_fps]
-        pcd = o3d.geometry.PointCloud()
+    # combine point clouds to one point cloud in blender
+    if cfg.visu.combine_point_clouds and len(cfg.dataset.lasers) > 1:
+        pcs = [o3d.io.read_point_cloud(str(point_cloud_dp / fnt.point_cloud.format(frame_idx=cfg.frame_idx, 
+                                                                                         sensor_name=laser_name))) 
+               for laser_name in cfg.dataset.lasers]
+        pcd = o3d.geometry.PointCloud()        
         pcd.points = o3d.utility.Vector3dVector(np.vstack([np.asarray(pc.points) for pc in pcs]))
         pcd.colors = o3d.utility.Vector3dVector(np.vstack([np.asarray(pc.colors) for pc in pcs]))
-        comnbined_pcd_fp = output_dp / f"{frame_id:05d}_COMBINED.ply"
+        
+        comnbined_pcd_fp = output_dp / fnt.combined_point_cloud.format(frame_idx=cfg.frame_idx)      
         o3d.io.write_point_cloud(str(comnbined_pcd_fp), pcd)
+        
         bpy.ops.wm.ply_import(filepath=str(comnbined_pcd_fp))
         imported_obj = bpy.context.view_layer.objects.active
-        apply_geometry_node_group(imported_obj, pc_geometry_node)
+        apply_geometry_node_group(imported_obj, cfg.blender.pc_geometry_node)
     else:        
         vehicle_frame = bpy.data.objects.get("Vehicle Frame")
-        for laser_name in lasers:
+        for laser_name in cfg.dataset.lasers:
             laser_collection = bpy.data.collections.new(f'Laser {laser_name}')
             main_collection.children.link(laser_collection)
             
             # set lidar visualization
-            extrinsics_fp = calibration_dp / f"extrinsics_laser_{laser_name}.npy"
+            extrinsics_fp = calibration_dp / fnt.extrinsics.format(sensor_type='laser', sensor_name=laser_name)
             extrinsics = np.load(extrinsics_fp)
             extrinsics = Matrix(extrinsics).to_4x4()
             
@@ -319,7 +284,7 @@ def create_blender_scene():
             lidar_obj.hide_viewport = True
             lidar_obj.hide_render = True
             
-            if axis_scaling > 0:
+            if cfg.visu.axes_size > 0:
                  # Create a new collection for the camera
                 frame_name = f'Frame Laser {laser_name}'
                 frame_collection = bpy.data.collections.new(frame_name)
@@ -329,27 +294,27 @@ def create_blender_scene():
                 # https://github.com/waymo-research/waymo-open-dataset/issues/726
                 laser_frame = utils.duplicate_object(vehicle_frame, collection=frame_collection)
                 laser_frame.name = frame_name
-                laser_frame.matrix_world = extrinsics @ Matrix.Scale(axis_scaling, 4)     
+                laser_frame.matrix_world = extrinsics @ Matrix.Scale(cfg.visu.axes_size, 4)     
                 
                 frame_collection.hide_viewport = True
                 frame_collection.hide_render = True           
             
-            pcd_fp = point_cloud_dp / laser_name / f"{frame_id:05d}_{laser_name}.ply" 
+            pcd_fp = point_cloud_dp / fnt.point_cloud.format(sensor_name=laser_name, frame_idx=cfg.frame_idx)
             bpy.ops.wm.ply_import(filepath=str(pcd_fp))
             imported_obj = bpy.context.view_layer.objects.active
             bpy.context.collection.objects.unlink(imported_obj)
             laser_collection.objects.link(imported_obj)
-            apply_geometry_node_group(imported_obj, pc_geometry_node)
+            apply_geometry_node_group(imported_obj, cfg.blender.pc_geometry_node)
 
-    # Create cameras    
-    for img_dim, camera_name in zip(image_dimensions, cameras):
+    # Create cfg.dataset.cameras    
+    for img_dim, camera_name in zip(image_dimensions, cfg.dataset.cameras):
         # load camera calibration
-        intrinsics_fp = calibration_dp / f"intrinsics_cam_{camera_name}.npz"
-        extrinsics_fp = calibration_dp / f"extrinsics_cam_{camera_name}.npy"
+        intrinsics_fp = calibration_dp / fnt.intrinsics.format(sensor_type='camera', sensor_name=camera_name)
+        extrinsics_fp = calibration_dp / fnt.extrinsics.format(sensor_type='camera', sensor_name=camera_name)
         intrinsics = np.load(intrinsics_fp, allow_pickle=True)        
         extrinsics = np.load(extrinsics_fp)
         
-        image_fp = image_dp / camera_name / f"{frame_id:05d}_{camera_name}.jpg"       
+        image_fp = image_dp / fnt.image.format(sensor_name=camera_name, frame_idx=cfg.frame_idx)    
         shutil.copy(image_fp, output_image_dp / image_fp.name)
         
         camera_collection = bpy.data.collections.new(f'Camera {camera_name}')
@@ -357,27 +322,19 @@ def create_blender_scene():
         
         create_blender_camera(camera_collection, camera_name, intrinsics, extrinsics, 
                               str(output_image_dp / image_fp.name), img_dim, render_dim, 
-                              sensor_width, far_plane_scale, near_plane_scale, 
-                              axis_scaling, frustum_material)
+                              cfg.visu, cfg.blender.frustum_material)
 
     # Set the resolution
     bpy.context.scene.render.resolution_x = max_image_width
     bpy.context.scene.render.resolution_y = max_image_height
         
-    output_path = output_dp / "output_file.blend"  # Update with your desired output path
+    output_path = output_dp / cfg.output_file_name
     bpy.ops.wm.save_as_mainfile(filepath=str(output_path))
     
-
-        
     print('Done')
-           
-                
-#######################################################################################################################   
-def main():
-    create_blender_scene()
     
 
 #######################################################################################################################
 if __name__ == '__main__':
-    main()
+    create_blender_scene()
 

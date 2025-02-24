@@ -1,0 +1,20 @@
+defaults:
+  - dataset: waymo
+  - hydra: default
+
+preprocessor:
+  _target_: data_processor.waymo_processor.WaymoPreprocessor
+
+
+write_images: true
+write_point_cloud: true
+
+dataset_dir: /media/gfkri/data/Datasets/waymo/raw_data  # path to the raw data, for waymo, to the tfrecord files
+
+sequences:
+  - segment-10584247114982259878_490_000_510_000_with_camera_labels # night
+  - segment-10455472356147194054_1560_000_1580_000_with_camera_labels # crossing
+  - segment-10837554759555844344_6525_000_6545_000_with_camera_labels # highway
+
+# frame_range: null
+frame_range: [55, 56]  # range of frames to process
