@@ -16,6 +16,46 @@ log = logging.getLogger(__name__)
 class KITTIPreprocessor():
     def __init__(self):
         super().__init__()
+        
+        
+#         ##########################################################################
+# def calib2vtk_camera(calib, size):
+#   camera = vtk.vtkCamera()
+
+#   T_world_cam = np.linalg.inv(calib.T_cam_world)
+#   cam_pos = T_world_cam[:3, 3]
+#   focal_point = np.matmul(T_world_cam, np.array([0, 0, 1, 1]))[:3]
+#   alpha_vert = 2 * math.atan(size.height / (2 * calib.K[1, 1]))
+
+#   camera.SetPosition(*cam_pos)
+#   camera.SetViewUp(-calib.T_cam_world[1, :3])
+#   camera.SetFocalPoint(*focal_point)
+#   camera.SetViewAngle(alpha_vert * 180 / math.pi)
+#   camera.SetClippingRange(0.001, 10e3)
+
+#   c_x = size.width - calib.K[0, 2]
+#   c_y = calib.K[1, 2]
+#   window_center_x = c_x / ((size.width - 1) / 2) - 1
+#   window_center_y = c_y / ((size.height - 1) / 2) - 1
+#   camera.SetWindowCenter(window_center_x, window_center_y)
+#   return camera
+
+
+# ##########################################################################
+# def compute_image_plane_transformation(calib, distance):
+#   T_world_cam = np.linalg.inv(calib.T_cam_world)
+#   T_t1 = np.eye(4, 4, dtype=np.float64)
+#   T_t1[0, 3] = -calib.K[0, 2]
+#   T_t1[1, 3] = -calib.K[1, 2]
+#   T_scale = np.eye(4, 4, dtype=np.float64)
+#   T_scale[0, 0] = distance / calib.K[0, 0]
+#   T_scale[1, 1] = distance / calib.K[1, 1]
+#   T_t2 = np.eye(4, 4, dtype=np.float64)
+#   T_t2[:3, 3] = distance * calib.T_cam_world[2, :3]
+#   T = np.matmul(T_scale, T_t1)
+#   T = np.matmul(T_world_cam, T)
+#   T = np.matmul(T_t2, T)
+#   return T
 
     ###################################################################################################################
     def init_sequence(self, sequence_dp, data, cfg):
