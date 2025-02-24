@@ -15,6 +15,8 @@ from waymo_open_dataset import dataset_pb2 as open_dataset
 
 from omegaconf import DictConfig, OmegaConf, open_dict
 
+log = logging.getLogger(__name__)
+
 #######################################################################################################################
 class WaymoPreprocessor():
     def __init__(self):
@@ -79,7 +81,7 @@ class WaymoPreprocessor():
         files = [f for f in files if f.stem in cfg.sequences]
         
         for fp in tqdm(files):
-            print(f"Processing file: {fp}")
+            log.info(f"Processing file: {fp}")
             sequence = fp.stem
             # Open config for modification and add 'sequence'
             # minor hack, but able to reuse the same config and filename templates

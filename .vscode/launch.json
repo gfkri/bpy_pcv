@@ -18,13 +18,48 @@
             }
         },
         {
-            "name": "Python: Point Cloud Visualization",
+            "name": "Python: Point Cloud Visualization Waymo",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/bpy_pc_visualization.py",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
             "justMyCode": true,
+            "python": "${workspaceFolder}/venv311/bin/python",
+            "env": {
+                "HYDRA_FULL_ERROR":"1"
+                // "PYTHONPATH": "${workspaceFolder}/thesis/scripts"
+            },
+            "args": [
+                "--config-name=bpy_pc_visualization_waymo",
+            ]
+        },
+        {
+            "name": "Python: Point Cloud Visualization KITTI",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/bpy_pc_visualization.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "python": "${workspaceFolder}/venv311/bin/python",
+            "env": {
+                "HYDRA_FULL_ERROR":"1"
+                // "PYTHONPATH": "${workspaceFolder}/thesis/scripts"
+            },
+            "args": [
+                "--config-name=bpy_pc_visualization_kitti",
+            ]
+        },
+        {
+            "name": "Python: Data Preparation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/dataset_preprocessing.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true,
+            "python": "${workspaceFolder}/venv/bin/python",
             "env": {
                 "HYDRA_FULL_ERROR":"1"
                 // "PYTHONPATH": "${workspaceFolder}/thesis/scripts"

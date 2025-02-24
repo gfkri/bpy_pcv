@@ -1,0 +1,18 @@
+defaults:
+  - dataset: kitti
+  - hydra: default
+
+preprocessor:
+  _target_: data_processor.kitti_processor.KITTIPreprocessor
+
+
+write_images: true
+write_point_cloud: true
+
+dataset_dir: /media/gfkri/data2/Datasets/kitti_raw/  # path to the raw data, for waymo, to the tfrecord files
+
+sequences:
+  - 2011_09_29/2011_09_29_drive_0004_sync # road / traffic jam
+
+# frame_range: null
+frame_range: [25, 26]  # range of frames to process

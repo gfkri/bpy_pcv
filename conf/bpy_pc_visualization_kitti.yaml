@@ -1,0 +1,10 @@
+defaults:
+  - dataset: kitti
+  - blender: default
+  - hydra: default
+  - visu: default
+
+
+sequence: "2011_09_29/2011_09_29_drive_0004_sync"
+frame_idx: 25
+output_file_name: output.blend

@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 
-
+import logging
 import shutil
 from debug_imports import *
 import os
@@ -18,6 +19,8 @@ from omegaconf import DictConfig, OmegaConf
 
 from tools import frustum, utils
 
+log = logging.getLogger(__name__)
+
 
 #######################################################################################################################
 # Function to link assets from the library
@@ -28,16 +31,16 @@ def load_assets(library_path, assets, link=False):
             # Check if the category exists in the library
             if hasattr(data_from, category):
                 available_assets = getattr(data_from, category)
-                print(f"Category: {category}")
-                print(f"  Available Assets: {available_assets}")
+                log.info(f"Category: {category}")
+                log.info(f"  Available Assets: {available_assets}")
                 
                 # Find and load the specified assets
                 assets_to_load = [name for name in asset_names if name in available_assets]
                 if assets_to_load:
                     setattr(data_to, category, assets_to_load)
-                    print(f"  Imported Assets: {assets_to_load}")
+                    log.info(f"  Imported Assets: {assets_to_load}")
                 else:
-                    print(f"  No matching assets found for: {asset_names}")
+                    log.info(f"  No matching assets found for: {asset_names}")
                     
 
 #######################################################################################################################
@@ -49,9 +52,9 @@ def apply_geometry_node_group(object, geometry_node_name):
         # Add a Geometry Nodes modifier
         geom_modifier = object.modifiers.new(name="GeometryNodes", type='NODES')
         geom_modifier.node_group = geom_node_group
-        print(f"Applied Geometry Node group '{geometry_node_name}' to {object.name}")
+        log.info(f"Applied Geometry Node group '{geometry_node_name}' to {object.name}")
     else:
-        print(f"Geometry Node group '{geometry_node_name}' not found.")
+        log.info(f"Geometry Node group '{geometry_node_name}' not found.")
         
         
 #######################################################################################################################        
@@ -158,8 +161,8 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
         camera_frame.name = frame_name
         camera_frame.matrix_world = extrinsics @ Matrix.Scale(cfg_visu.axes_size, 4)
         
-        frame_collection.hide_viewport = True
-        frame_collection.hide_render = True      
+        # frame_collection.hide_viewport = True
+        # frame_collection.hide_render = True      
 
     # Set the camera as the active camera
     if camera_name == 'FRONT':
@@ -202,9 +205,9 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     
        
 #######################################################################################################################
-@hydra.main(version_base=None, config_path="conf", config_name="bpy_pc_visualization")
+@hydra.main(version_base=None, config_path="conf", config_name="bpy_pc_visualization_waymo")
 def create_blender_scene(cfg : DictConfig) -> None:
-    print(OmegaConf.to_yaml(cfg)) 
+    log.info(OmegaConf.to_yaml(cfg)) 
 
     output_dp = pathlib.Path(hydra.core.hydra_config.HydraConfig.get().runtime.output_dir)
     image_dp = pathlib.Path(cfg.dataset.cache_dirs.images)
@@ -226,7 +229,7 @@ def create_blender_scene(cfg : DictConfig) -> None:
         image_dimensions.append(image.shape)
         max_image_width = max(max_image_width, image.shape[1])
         max_image_height = max(max_image_height, image.shape[0])
-        print('Image resolution:', image.shape)
+        log.info('Image resolution:', image.shape)
         
     render_dim = (max_image_width, max_image_height)
     
@@ -247,9 +250,9 @@ def create_blender_scene(cfg : DictConfig) -> None:
         # Remove all objects in the collection
         for obj in list(main_collection.objects):  # Use list() to avoid modification during iteration
             bpy.data.objects.remove(obj, do_unlink=True)
-        print(f"Cleared all objects in the collection: {cfg.blender.frame_collection_name}")
+        log.info(f"Cleared all objects in the collection: {cfg.blender.frame_collection_name}")
     else:
-        print(f"Collection '{cfg.blender.frame_collection_name}' not found.")
+        log.info(f"Collection '{cfg.blender.frame_collection_name}' not found.")
         
     # combine point clouds to one point cloud in blender
     if cfg.visu.combine_point_clouds and len(cfg.dataset.lasers) > 1:
@@ -331,7 +334,7 @@ def create_blender_scene(cfg : DictConfig) -> None:
     output_path = output_dp / cfg.output_file_name
     bpy.ops.wm.save_as_mainfile(filepath=str(output_path))
     
-    print('Done')
+    log.info('Done')
     
 
 #######################################################################################################################

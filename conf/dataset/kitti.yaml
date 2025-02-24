@@ -1,0 +1,14 @@
+defaults:
+  - default
+
+cache_dirs:
+  root: "data/kitti"
+
+cameras:
+  # - "cam0"
+  # - "cam1"
+  - "cam2"
+  - "cam3"
+
+lasers:
+  - "velo"
