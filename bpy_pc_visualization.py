@@ -94,18 +94,18 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
     focal_length = f_u / max_image_width * cfg_visu.sensor_width
     image_plane_distance = f_u / max_image_width * cfg_visu.far_plane_ratio
     
-    R = extrinsics[:3, :3]
-    t = extrinsics[:3, 3:4]
+    R_vehicle2cam = extrinsics[:3, :3]
+    t_vehicle2cam = extrinsics[:3, 3:4]
+
+    # kitti/opencv camera to blender camera ax swap: x>x, y>-y, z>-z to be consistent with blender
+    ax_swap2blender_cam = np.array([[ 1,  0,  0],
+                                    [ 0, -1,  0],
+                                    [ 0,  0, -1]])
+
+    R_vehicle2cam = ax_swap2blender_cam @ R_vehicle2cam
+    t_vehicle2cam = ax_swap2blender_cam @ t_vehicle2cam
     
-    extrinsics = np.vstack((np.hstack((R, t)), np.array([0, 0, 0, 1])))
-    extrinsics = Matrix(extrinsics).to_4x4()
-            
-    # camera to vehicle ax swap: x>-y, y>z, z>-x to be consistent with blender
-    ax_swap = np.array([[ 0, 0, -1],
-                        [-1, 0,  0],
-                        [ 0, 1,  0]])
-    R = R @ ax_swap
-    T_cam2vehicle = np.vstack((np.hstack((R, t)), np.array([0, 0, 0, 1])))
+    T_cam2vehicle = np.vstack((np.hstack((R_vehicle2cam.T, -R_vehicle2cam.T @ t_vehicle2cam)), np.array([0, 0, 0, 1])))
     T_cam2vehicle = Matrix(T_cam2vehicle).to_4x4()
     
     # create image plane
@@ -159,7 +159,7 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
         vehicle_frame = bpy.data.objects.get("Vehicle Frame")
         camera_frame = utils.duplicate_object(vehicle_frame, collection=frame_collection)
         camera_frame.name = frame_name
-        camera_frame.matrix_world = extrinsics @ Matrix.Scale(cfg_visu.axes_size, 4)
+        camera_frame.matrix_world = T_cam2vehicle @ Matrix.Scale(cfg_visu.axes_size, 4)
         
         # frame_collection.hide_viewport = True
         # frame_collection.hide_render = True      
@@ -197,11 +197,11 @@ def create_blender_camera(main_collection, camera_name, intrinsics, extrinsics, 
                                                              cfg_visu.near_plane_ratio)      
         
         
-    frustum_obj = frustum.create_frustum(f"Frustum {camera_name}", frustum_corners, thickness=0.01)
+    # frustum_obj = frustum.create_frustum(f"Frustum {camera_name}", frustum_corners, thickness=0.01)
     
     # Apply the frustum material
-    frustum_obj.data.materials.append(bpy.data.materials[frustum_material])    
-    main_collection.objects.link(frustum_obj)
+    # frustum_obj.data.materials.append(bpy.data.materials[frustum_material])    
+    # main_collection.objects.link(frustum_obj)
     
        
 #######################################################################################################################
@@ -333,6 +333,8 @@ def create_blender_scene(cfg : DictConfig) -> None:
         
     output_path = output_dp / cfg.output_file_name
     bpy.ops.wm.save_as_mainfile(filepath=str(output_path))
+    bpy.ops.wm.open_mainfile(filepath=str(output_path))
+
     
     log.info('Done')
     

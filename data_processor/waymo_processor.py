@@ -55,6 +55,19 @@ class WaymoPreprocessor():
                 }                        
 
                 extrinsics = np.array(calibration.extrinsic.transform, dtype=np.float64).reshape(4, 4)
+                R_cam2vehicle, t_cam2vehicle = extrinsics[:3, :3], extrinsics[:3, 3]
+                
+                R_vehicle2cam = R_cam2vehicle.T
+                t_vehicle2cam = -R_vehicle2cam @ t_cam2vehicle
+                
+                # axis swap to match kitti coordinate system
+                ax_swap2kitt = np.array([[ 0, -1,  0],
+                                         [ 0,  0, -1],
+                                         [ 1,  0,  0]])
+                
+                extrinsics[:3, :3] = ax_swap @ R_vehicle2cam
+                extrinsics[:3, 3] = ax_swap @ t_vehicle2cam
+               
                 np.savez(calibration_dp / fnt.intrinsics.format(sensor_type='camera', 
                                                                 sensor_name=camera_name), **camera_intrinsics)
                 np.save(calibration_dp / fnt.extrinsics.format(sensor_type='camera', 

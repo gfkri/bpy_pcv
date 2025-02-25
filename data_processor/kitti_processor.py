@@ -81,21 +81,12 @@ class KITTIPreprocessor():
                     'c_u': P[0, 2],
                     'c_v': P[1, 2],
                 }                        
-                # camera to velo/vehicle transformation
-                extrinsics = getattr(data.calib, f'T_{camera_name}_velo')
                 np.savez(calibration_dp / fnt.intrinsics.format(sensor_type='camera', 
                                                                 sensor_name=camera_name), **camera_intrinsics)
                 
-                R, t = extrinsics[:3, :3], extrinsics[:3, 3]
-                c = -R.T @ t
-                ax_swap = np.array([[ 0, 0,  1],
-                                    [-1, 0,  0],
-                                    [ 0, -1,  0]])
-                R = ax_swap @ R            
-                # t = -R.T @ c
-                extrinsics[:3, :3] = R
-                extrinsics[:3, 3] = c   
-                
+                # camera to velo/vehicle transformation
+                extrinsics = getattr(data.calib, f'T_{camera_name}_velo')
+                                
                 np.save(calibration_dp / fnt.extrinsics.format(sensor_type='camera', 
                                                                sensor_name=camera_name), extrinsics)
                 

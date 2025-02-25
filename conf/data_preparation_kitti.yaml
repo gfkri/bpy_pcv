@@ -15,4 +15,4 @@ sequences:
   - 2011_09_29/2011_09_29_drive_0004_sync # road / traffic jam
 
 # frame_range: null
-frame_range: [25, 26]  # range of frames to process
+frame_range: [25, 45]  # range of frames to process

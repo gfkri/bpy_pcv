@@ -6,5 +6,5 @@ defaults:
 
 
 sequence: "2011_09_29/2011_09_29_drive_0004_sync"
-frame_idx: 25
+frame_idx: 41
 output_file_name: output.blend
